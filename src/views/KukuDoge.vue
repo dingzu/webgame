@@ -1,24 +1,34 @@
 <template>
   <div class="kukudoge">
-    这是一个小游戏
-    游戏区域大小 
-    <input type="text" v-model.number="gameSpace[0]"/> x 
-    <input type="text" v-model.number="gameSpace[1]"/>
-    <p>当前裤裤在</p>
-    <input type="text" v-model.number="kuku.position[0]"/> ,
-    <input type="text" v-model.number="kuku.position[1]"/>
-    <p>现在发生了啥子: {{log}}</p>
-    <p>游戏目标: 控制 裤裤doge 把粑粑拉在床上</p>
-    <p>注释: 黑色是墙，黄色是床，褐色是粑粑，左右方向键移动，下键拉粑粑（0.2版本,可以无限拉）</p>
+    <p class="log">{{log}}</p>
     <div class="game-space" :style="resolveGameSpaceWidthHeight()">
       <!-- 裤裤的位置 -->
-      <div class="kuku" :style="resolvePositonAndDirection()" ref="kuku">➤</div>
+      <div class="kuku" :style="resolvePositonAndDirection()" ref="kuku">🐕</div>
       <!-- 地图 -->
       <div class="map">
         <div v-for="(col,i) in gameSpace[0]" :key="i" class="game-space-h">
           <div v-for="(row,j) in gameSpace[1]" :key="j" class="game-space-w" :class="resolveCellKind(i,j)"></div>
         </div>
       </div>
+    </div>
+    <!-- 状态提示 -->
+    <div class="kuku-state">
+        <p class="tips">裤存:<span v-for="(item,i) in kuku.shits" :key="i">💩</span></p>
+    </div>
+    <!-- PC UI -->
+    <div class="tips-content">
+      <p class="tips">⬅️➡️移动，🔼上楼， ⬇️下楼/拉💩</p>
+    </div>
+    <!-- 移动端 UI -->
+    <div class="mobile-ui">
+        <div class="line">
+          <div class="button" @click="kukuGo('left')"> ⬅️ </div>
+          <div class="button" @click="kukuShit()"> 💩 </div>
+          <div class="button" @click="kukuGo('right')"> ➡️ </div>
+        </div>
+        <div class="line">
+          <div class="button" @click="kukuGoDown()"> ⬇️ </div>
+        </div>
     </div>
   </div>
 </template>
@@ -30,18 +40,19 @@ export default {
             gameSpace: [10,6],  // 游戏网格的数量 [ 横, 纵向]
             gameCell: [30, 1],  // 游戏单个网格的大小 [大小,网格间隔尺寸]
             kuku: {             // 裤裤的属性参数
-              position: [1,1],  // 裤裤的位置参数
+              position: [0,0],  // 裤裤的位置参数
               direction: 1,     // 裤裤的朝向，1 代表右，-1 代表左
+              shits: 4,         // 还可以拉的次数
             },
             cellKind: [        // 记录地形 0 代表空，1 代表地面， 2 代表床，3 代表粑粑  ，4 代表梯子
-               '1111111111/' ,
-               '1111111111/' ,
-               '1111111111/' ,
-               '1111111111/' ,
-               '0000000002/' ,
+               '0000000000/' ,
+               '1111101141/' ,
+               '0000000040/' ,
+               '1114110111/' ,
+               '0004000002/' ,
                '1111110111/' ,
             ],       
-            log: '啥子都没发生' // logo
+            log: '控制一只叫【裤裤】的 🐕 把 💩拉在 🛌上' // logo
         }
     },
     created: function() {       // 添加全局快捷键监听  
@@ -58,7 +69,7 @@ export default {
             const x = this.kuku.position[0] * (this.gameCell[0] + 2 * this.gameCell[1])
             const y = this.kuku.position[1] * (this.gameCell[0] + 2 * this.gameCell[1])
             const direction = this.kuku.direction
-            return "left:" + x +"px; bottom:"+ y +"px;" + "transform:scale("+direction +")"
+            return "left:" + x +"px; top:"+ y +"px;" + "transform:scaleX("+ -1 * direction +")"
         },
         resolveGameSpaceWidthHeight() { //计算地图的大小
             const width = (this.gameCell[0]+ 2 * this.gameCell[1]) * this.gameSpace[0]
@@ -66,16 +77,21 @@ export default {
             return "width:" + width +"px; height:"+ height +"px;"
         },
         resolveCellKind(i,j) { //绘制地形
-            const kind = this.cellKind[j][i]
+            let kind = 0
+            if (j <  this.cellKind.length) {
+                kind = this.cellKind[j][i]
+            } else {
+                kind = 1
+            }
             return "cell-kind-" + kind
         },
         onType(key) { //监听快捷键 38 代表上，40 代表下，37 代表左，39 代表右，32 代表空格
             switch(key) {
               case 37: this.kukuGo('left')
               break;
-              case 38: this.log = "裤裤想往上走，但是这里没有梯子"
+              case 38: this.kukuClimbUp()
               break;
-              case 40: this.kukuShit()
+              case 40: this.kukuDown()
               break;
               case 39: this.kukuGo('right')
               break;
@@ -115,15 +131,22 @@ export default {
             }
         },
         canKukuGo(target) { // 裤裤能行么
-            if(this.isTargetBlank(target) && this.isTargetNotCliff(target)) {
+            if((this.isTargetBlank(target)||this.isTargetLadder(target)) && this.isTargetNotCliff(target)) {
                 return true
             } else {
                 return false
             }
         },
+        isTargetLadder(target){ //前面是梯子
+            const cellTarget = this.cellKind[target[1]][target[0]]
+            if(this.isInMap(target) && cellTarget === '4') {
+                return true
+            }  else {
+                return false
+            }
+        },
         isTargetBlank(target){ //前面是空地
-            const newArry =[...this.cellKind].reverse() //获取地形数据
-            const cellTarget = newArry[target[1]][target[0]]
+            const cellTarget = this.cellKind[target[1]][target[0]]
             if(this.isInMap(target) && cellTarget === '0') {
                 return true
             } else if (cellTarget === '2'){
@@ -140,8 +163,7 @@ export default {
             }
         },
         isTargetNotCliff(target){ //前面不是悬崖
-            const newArry =[...this.cellKind].reverse() //获取地形数据
-            const cellUnderTarget = newArry[target[1]-1][target[0]]
+            const cellUnderTarget = this.cellKind[target[1]+1][target[0]]
             if (cellUnderTarget !== '0') {
                 return true
             } else {
@@ -149,8 +171,7 @@ export default {
             }
         },
         targetIsBed(target){ //前面是床
-            const newArry =[...this.cellKind].reverse() //获取地形数据
-            const cellTarget = newArry[target[1]][target[0]]
+            const cellTarget = this.cellKind[target[1]][target[0]]
             if(cellTarget === '2') {
                 return true
             } else {
@@ -158,14 +179,14 @@ export default {
             }
         },
         kukuShit() { //控制裤裤拉粑粑
-            const newArry =[...this.cellKind].reverse() //获取地形数据
             let target = [this.kuku.position[0] - this.kuku.direction,this.kuku.position[1]]
             if (this.targetAllows(target)) {
+                this.kuku.shits -= 1
                 target = this.testTarget(target)
                 if (this.targetIsBed(target)) {
                    this.startShit(target)
                    this.log = "💩拉床上了!!!!!!!!!!!!!!"
-                   alert("💩拉床上了!!!!!!!!!!!!!!")
+                   alert("YOU WIN : 💩拉床上了!!!!!!!!!!!!!!")
                 } else {
                    this.startShit(target)
                 }
@@ -178,25 +199,59 @@ export default {
             this.changeCell(target, 3) //变化地形
         },
         targetAllows(target) { //当前地形是否允许拉
-           if (this.isTargetBlank(target)){  
+           if (this.isTargetBlank(target) || this.isTargetLadder(target)){  
                return true
            } else {
                return false
            }
         },
         changeCell(target, kind){ //地形变化函数
-           const arr = this.cellKind[this.gameSpace[1]-target[1]-1] //要变化的数据
-           this.cellKind[this.gameSpace[1]-target[1]-1] = this.replaceArr(arr, target[0]+1, 3)
+           const arr = this.cellKind[target[1]] //要变化的数据
+           this.cellKind[target[1]] = this.replaceArr(arr, target[0]+1, 3)
         },
         replaceArr(arr, order, to){
            return arr.substring(0,order-1)+to+arr.substring(order);
         },
         testTarget(target){
            if (!this.isTargetNotCliff(target)){
-               return [target[0],target[1]-1]
+               return [target[0],target[1]+1]
            } else {
                return target
            }
+        },
+        kukuClimbUp(){
+           if (this.canUp()){
+               this.log = '向上爬'
+               const target = [this.kuku.position[0],this.kuku.position[1]-1]
+               this.$set(this.kuku, 'position', [target[0],target[1]])
+           } 
+        },
+        canUp(){
+            const now = [this.kuku.position[0],this.kuku.position[1]]
+            if (this.kuku.position[1]>0 &&  this.isTargetLadder(now)) {
+                return true
+            } else {
+                this.log = '裤裤想上去，但是上不去'
+                return false
+            }
+        },
+        kukuDown() {
+            const target = [this.kuku.position[0],this.kuku.position[1]+1]
+            if (this.isTargetLadder(target)) {
+                this.log = '裤裤下楼了'
+                this.$set(this.kuku, 'position', [target[0],target[1]])
+            } else {
+                if(this.kuku.shits > 0) { this.kukuShit() } else {this.log='没有料了'}
+            }
+        },
+        kukuGoDown() {
+            const target = [this.kuku.position[0],this.kuku.position[1]+1]
+            if (this.isTargetLadder(target)) {
+                this.log = '下楼了'
+                this.$set(this.kuku, 'position', [target[0],target[1]])
+            } else {
+                this.log = '裤裤想下去，下不去'
+            }            
         }
     }
 }
@@ -214,12 +269,12 @@ $game-cell-margin = 1px
     .kuku
       width $game-cell
       height $game-cell
-      background-color red
       position absolute
       margin $game-cell-margin
-      color #fff
       line-height $game-cell
-      transition .2s left ease-in-out
+      transition .2s left ease-in-out, .2s top ease-in-out
+      font-size 24px
+      z-index 100
 // 游戏区域绘制
 .kukudoge
   .game-space .map
@@ -250,7 +305,88 @@ $game-cell-margin = 1px
     &.cell-kind-1  // 地面地形
       background-color #000
     &.cell-kind-2  // 床地形
-      background-color #ffff00
+      position relative
+      &:before
+        content '🛌'
+        display block
+        width $game-cell
+        height $game-cell
+        line-height $game-cell
+        text-align center
+        font-size 24px
     &.cell-kind-3  // 粑粑地形
-      background-color brown
+      position relative
+      &:before
+        content '💩'
+        display block
+        width $game-cell
+        height $game-cell
+        line-height $game-cell
+        text-align center
+        font-size 24px
+    &.cell-kind-4  // 梯子地形
+      background url('../assets/tizi.svg') 100%
+// 游戏 UI-PC
+.kukudoge
+  .log
+    display block
+    width 100%
+    height 40px
+    margin auto
+    background-color #ebebeb
+    color #333
+    line-height 40px
+    font-size 14px
+  .tips
+    text-align center
+    font-size 16px
+    color #999
+    margin 14px 0
+  .tips-content
+    width 320px
+    margin 40px auto 
+  @media (max-device-width: 500px)
+    .tips-content
+      display none
+// 游戏 UI-移动端
+.kukudoge
+  .mobile-ui
+    display none 
+  @media (max-device-width: 500px)
+    .mobile-ui
+      display block
+      margin 60px auto
+      width 280px
+      .line
+        width 280px
+        display flex
+        margin 0 0 20px 0
+        justify-content center
+      .button
+        display block
+        width 50px
+        height 50px
+        background-color #f5f5f5
+        font-size 24px
+        line-height 50px
+        margin 0 10px
+// 状态提示栏
+.kukudoge .kuku-state
+  margin 24px 0
+  background-color #f5f5f5
+  width 320px
+  margin auto
+  height 40px
+  p
+    line-height 32px
+    font-size 14px
+    text-align left
+    padding 0 12px
+    span
+      font-size 24px
+      line-height 34px
+      position relative
+      top 4px
+      &:first-child
+        margin-left 12px
 </style>
