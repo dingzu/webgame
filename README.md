@@ -1,29 +1,11 @@
-# dogekuku
+# DogeKuku
 
-## Project setup
-```
-yarn install
-```
+## TODO List
 
-### Compiles and hot-reloads for development
-```
-yarn run serve
-```
+- [ ] 更新游戏框架，分离游戏逻辑和渲染逻辑
+- [ ] 优化操控，增强PC和移动端的体验
+- [ ] 增加游戏玩法，增加进食玩法和💩的种类
+- [ ] 多语言支持，让💩拉向世界
+- [ ] ~~支持阿拉伯文~~
 
-### Compiles and minifies for production
-```
-yarn run build
-```
-
-### Run your tests
-```
-yarn run test
-```
-
-### Lints and fixes files
-```
-yarn run lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+更多功能更新需求可以直接在 README 中更新，或提交 Issue。
