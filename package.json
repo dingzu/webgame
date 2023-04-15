@@ -33,6 +33,9 @@
       "autoprefixer": {}
     }
   },
+  "engines": {
+    "node": ">16.14.0 <17"
+  },
   "browserslist": [
     "> 1%",
     "last 2 versions"
